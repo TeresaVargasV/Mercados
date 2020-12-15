@@ -63,7 +63,8 @@ declarations
 	v_max=20000 
 	pl_max=20000 
 	ql_max=20000
-	!falta valor tan(phi) es parametro?
+	tan_phi_k1=0.2031	!para un cos(phi)=0.98
+	tan_phi_k4=0.3287	!para un cos(phi)=0.95
 	
 	!Variables de decisión-----------------------------------------------
 	!variables FO
