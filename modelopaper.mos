@@ -53,11 +53,16 @@ declarations
 	
 	!parametros power flow
 	h:array(barras, agregadores) of integer
+	h_sub:array(barras) of integer
 	p_d, q_d: array(barras, periodos) of real !demanda fija
 	a: array(lineas, barras) of integer
 	r, x: array(lineas) of real
 	c:array(barras, barras) of integer
-	v_min, v_max, pl_max, ql_max: real
+	!paper no entrega el valor
+	v_min=20000 
+	v_max=20000 
+	pl_max=20000 
+	ql_max=20000
 	!falta valor tan(phi) es parametro?
 	
 	!Variables de decisión-----------------------------------------------
@@ -87,6 +92,7 @@ end-declarations
 
 !importar datos desde excel
 initialisations from 'mmsheet.excel:'+'datos.xlsx'
+	!precios
 	pi_e		as "skiph;noindex;pi_e"
 	pi_capup	as "skiph;noindex;pi_capup"
 	pi_capdn	as "skiph;noindex;pi_capup"
@@ -101,6 +107,16 @@ initialisations from 'mmsheet.excel:'+'datos.xlsx'
 	s_dn	as "skiph;noindex;s_dn"
 	mu_up	as "skiph;noindex;mu_up"
 	mu_dn	as "skiph;noindex;mu_dn"
+	!demanda fija
+	p_d	as "skiph;noindex;p_d"
+	q_d	as "skiph;noindex;p_q"
+	!topologia red
+	h	as "skiph;noindex;h"
+	h_sub	as "skiph;noindex;h_sub"
+	a	as "skiph;noindex;a"
+	r	as "skiph;noindex;r_l"
+	x	as "skiph;noindex;x_l"
+	c	as "skiph;noindex;c_mn"
 end-initializations
 
 !Funcion objetivo 
