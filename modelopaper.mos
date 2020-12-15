@@ -19,7 +19,7 @@ declarations
 	!precios mercado
 	pi_e, pi_capup, pi_capdn, pi_milup, pi_mildn: array(periodos) of real
 	pi_ek, pi_kcapup, pi_kcapdn, pi_kmilup, pi_kmildn: array(periodos,agregadores) of real
-	pi_ak1: array(peiodos) of real !se asume A={1}
+	!pi_ak1: array(peiodos) of real !se asume A={1} y se incluye en pi_ek
 	
 	!parametros mileage caiso
 	s_dn, s_up, mu_up, mu_dn: array(periodos) of real
@@ -59,7 +59,7 @@ declarations
 	r, x: array(lineas) of real
 	c:array(barras, barras) of integer
 	!paper no entrega el valor
-	v_min=20000 
+	v_min=0 
 	v_max=20000 
 	pl_max=20000 
 	ql_max=20000
@@ -68,7 +68,7 @@ declarations
 	
 	!Variables de decisión-----------------------------------------------
 	!variables FO
-	p_sub, r_subup, r_subdn: array(periodos) of mpvar
+	p_sub,q_sub, r_subup, r_subdn: array(periodos) of mpvar
 	p_k, r_kup, r_kdn: array(periodos, agregadores) of mpvar !incluye k1
 	
 	!variables DRAGs
@@ -85,8 +85,9 @@ declarations
 	
 	!Variables distribution power flow
 	pl, ql: array(lineas,periodos) of mpvar
-	v_m,v_n: array(barras,periodos) of mpvar
+	v: array(barras,periodos) of mpvar
 	
+	!funcion objetivo
 	objetivo:linctr
 	
 end-declarations
@@ -126,7 +127,7 @@ objetivo:= sum(t in periodos)(-p_sub(t)*pi_e(t)-r_subup(t)*pi_capup(t)-r_subdn(t
           sum(k in agregadores|(k=2 or k=4))p_k(t,k)*pi_ek(t,k)-sum(k in agregadores|k=3)p_k(t,k)*pi_e(t,k)+ 
           sum(k in agregadores)(r_kup(t,k)*pi_kcapup(t,k)+r_kdn(p,k)*pi_kcapdn(t,k)+ 
           r_kup(t,k)*s_dn(t)*mu_up(t)*pi_kmilup(t,k)+r_kdn(t,k)*s_dn(t)*mu_dn(t)*pi_kmildn(t,k))- 
-          sum(k in agregadores|k=1)p_k(t,k)*pi_ak1(t)) 
+          sum(k in agregadores|k=1)p_k(t,k)*pi_ek(t,k)) 
           
  !Restricciones DRAGs
  forall(t in periodos, k in agregadores) do 
@@ -143,9 +144,18 @@ objetivo:= sum(t in periodos)(-p_sub(t)*pi_e(t)-r_subup(t)*pi_capup(t)-r_subdn(t
  end-do 
  
  !Restricciones ESAGs (CONDICIONES INICIALES(?)) 
+ 
+ !restriccion de inventario periodo 1
+ p_k(1,2)=e_k20-e_k2(1)+(1/eta_di)*r_kcapup(1,2)*mu_up(1)-eta_ch*r_kcapdn(1,2)*mu_dn(1) !R(7) 	
+ 
+ !restriccion de inventario otros periodos
+ forall(t in 2..munPeriodos)do 
+ 	p_k(t,2)=e_k2(t-1)-e_k2(t)+(1/eta_di)*r_kcapup(t,2)*mu_up(t)-eta_ch*r_kcapdn(t,2)*mu_dn(t) !R(7) 	
+ end-do
+ !otras restricciones
  forall(t in periodos,k in agregadores)do 	
 	  if(k=2) then 	 
-	      p_k(t,k)=e_k2(t-1)-e_k2(t)+(1/eta_di)*r_kcapup(t,k)*mu_up(t)-eta_ch*r_kcapdn(t,k)*mu_dn(t) !R(7) 	 
+	      !p_k(t,k)=e_k2(t-1)-e_k2(t)+(1/eta_di)*r_kcapup(t,k)*mu_up(t)-eta_ch*r_kcapdn(t,k)*mu_dn(t) !R(7) 	 
 	      p_k(t,k)=(1/eta_di)*p_k2di(t)-eta_ch*p_k2tch(t) !R(8) 	 
 	      r_kcapup(t,k)=r_k2capup_di(t)+r_k2capdn_ch(t) !R(9) 	
 	      r_kcapdn(t,k)=r_k2capdn_di(t)+r_k2capup_ch(t) !R(10) 	 
@@ -195,10 +205,45 @@ forall(t in periodos, k in agregadores) do
 		p_k(t,k)+r_kcapup(t,k)<=p_k4max !R(26)
 		p_k(t,k)-r_kcapdn(t,k)>=P_k4min !R(27)
 		r_kcapup(t,k)>=0 !R(28)
-		r_kcapup()<=ru 
+		r_kcapup(t,k)<=ru 
 		r_kcapdn(t,k)>=0 !R(29)
-		r_kcapdn()<=rd 
+		r_kcapdn(t,k)<=rd 
 	end-if
+end-do
+
+!Restricciones de flujos de potencia activa, R(30)
+forall(t in periodos,b in barras) do
+	h(b,1)*p_k(t,1) + h(b,3)*p_k(t,3)+p_d(b,t) -  h(b,2)*p_k(t,2)- h(b,4)*p_k(t,4)
+		+ h_sub(b)*p_sub(t) +sum(l in lineas)pl(l,t)*a(l,b) = 0		
+	pl(l,t) is_free	
+end-do
+!Restricciones de flujos de potencia reactiva, R(31)
+forall(t in periodos,b in barras) do
+	h(b,1)*p_k(t,1)*tan_phi_k1  +q_d(b,t) - h(b,4)*p_k(t,4)*tan_phi_k4
+		+ h_sub(b)*q_sub(t) +sum(l in lineas)ql(l,t)*a(l,b) = 0		
+	ql(l,t) is_free	
+end-do
+!Restricciones de voltaje, R(32)
+forall(t in periodos, m in barras, n in barras,l in lineas) do
+	if (c(m,n)=1 and a(l,n))then
+		v(m,t)=v(n,t)-(r(l)*pl(l,t)+x(l)+ql(l,t))
+	end-if
+end-do
+!Restricciones maximo y minimo
+forall(t in periodos, n in barras) do
+	v(n,t)>=v_min !R(34)
+	v(n,t)<=v_max
+end-do
+!Restricciones flujo
+forall(t in periodos, l in lineas) do
+	pl(l,t)>=-pl_max !R(34)
+	pl(l,t)<=ql_max
+	ql(l,t)>=-pl_max !R(34)
+	ql(l,t)<=ql_max
+end-do
+!Restricciones suma ofertas
+forall(t in periodos) do
+	r_subup(t)=
 end-do
 
 if PROJECTDIR <> '' then
