@@ -1,6 +1,5 @@
-!@encoding CP1252
 model Modelopaper
-uses "mmxprs","mmnl","mmsheet"; !gain access to the Xpress-Optimizer solver
+uses "mmxprs","mmsheet"; !gain access to the Xpress-Optimizer solver
 
 declarations
 	!Indices
@@ -84,7 +83,8 @@ declarations
 	b_k2: array(periodos) of mpvar !variable binaria
 	
 	!Variables EVCS
-	b_k3: array(periodos) of mpvar !variable binaria
+	!b_k3: array(periodos) of mpvar !variable binaria
+	b_k3: mpvar !variable binaria
 	!Variables DDGAG, ya estan todas
 	
 	!Variables distribution power flow
@@ -127,11 +127,17 @@ end-initializations
 
 !Funcion objetivo 
 objetivo:= sum(t in periodos)(-p_sub(t)*pi_e(t)-r_subup(t)*pi_capup(t)-r_subdn(t)*pi_capdn(t)- 
-          r_subup(t)*s_up(t)*mu_up(t)*pi_milup(t)-r_subdn*s_dn(t)*mu_dn(t)*pi_mildn(t)+
-          sum(k in agregadores|(k=2 or k=4))p_k(t,k)*pi_ek(t,k)-sum(k in agregadores|k=3)p_k(t,k)*pi_e(t,k)+ 
-          sum(k in agregadores)(r_kcapup(t,k)*pi_kcapup(t,k)+r_kcapdn(p,k)*pi_kcapdn(t,k)+ 
+          r_subup(t)*s_up(t)*mu_up(t)*pi_milup(t)-r_subdn(t)*s_dn(t)*mu_dn(t)*pi_mildn(t)+
+          sum(k in agregadores|(k=2 or k=4))p_k(t,k)*pi_ek(t,k)-sum(k in agregadores|k=3)p_k(t,k)*pi_ek(t,k)+ 
+          sum(k in agregadores)(r_kcapup(t,k)*pi_kcapup(t,k)+r_kcapdn(t,k)*pi_kcapdn(t,k)+ 
           r_kcapup(t,k)*s_dn(t)*mu_up(t)*pi_kmilup(t,k)+r_kcapdn(t,k)*s_dn(t)*mu_dn(t)*pi_kmildn(t,k))- 
-          sum(k in agregadores|k=1)p_k(t,k)*pi_ek(t,k)) 
+          sum(k in agregadores|k=1)p_k(t,k)*pi_ek(t,k))
+!objetivo:= sum(t in periodos)(-p_sub(t)*pi_e(t)-r_subup(t)*pi_capup(t)-r_subdn(t)*pi_capdn(t)- 
+ !         r_subup(t)*s_up(t)*mu_up(t)*pi_milup(t)-r_subdn(t)*s_dn(t)*mu_dn(t)*pi_mildn(t)+
+  !        p_k(t,2)*pi_ek(t,2)+ p_k(t,4)*pi_ek(t,4)-p_k(t,3)*pi_ek(t,3)+ 
+   !       sum(k in agregadores)(r_kcapup(t,k)*pi_kcapup(t,k)+r_kcapdn(t,k)*pi_kcapdn(t,k)+ 
+    !      r_kcapup(t,k)*s_dn(t)*mu_up(t)*pi_kmilup(t,k)+r_kcapdn(t,k)*s_dn(t)*mu_dn(t)*pi_kmildn(t,k))- 
+     !     p_k(t,1)*pi_ek(t,1))
 
  !Restricciones DRAGs
  forall(t in periodos, k in agregadores) do 
@@ -153,14 +159,14 @@ objetivo:= sum(t in periodos)(-p_sub(t)*pi_e(t)-r_subup(t)*pi_capup(t)-r_subdn(t
  p_k(1,2)=e_k20-e_k2(1)+(1/eta_di)*r_kcapup(1,2)*mu_up(1)-eta_ch*r_kcapdn(1,2)*mu_dn(1) !R(7) 	
  
  !restriccion de inventario otros periodos
- forall(t in 2..munPeriodos)do 
+ forall(t in 2..numPeriodos)do 
  	p_k(t,2)=e_k2(t-1)-e_k2(t)+(1/eta_di)*r_kcapup(t,2)*mu_up(t)-eta_ch*r_kcapdn(t,2)*mu_dn(t) !R(7) 	
  end-do
  !otras restricciones
  forall(t in periodos,k in agregadores)do 	
 	  if(k=2) then 	 
 	      !p_k(t,k)=e_k2(t-1)-e_k2(t)+(1/eta_di)*r_kcapup(t,k)*mu_up(t)-eta_ch*r_kcapdn(t,k)*mu_dn(t) !R(7) 	 
-	      p_k(t,k)=(1/eta_di)*p_k2di(t)-eta_ch*p_k2tch(t) !R(8) 	 
+	      p_k(t,k)=(1/eta_di)*p_k2di(t)-eta_ch*p_k2ch(t) !R(8) 	 
 	      r_kcapup(t,k)=r_k2capup_di(t)+r_k2capdn_ch(t) !R(9) 	
 	      r_kcapdn(t,k)=r_k2capdn_di(t)+r_k2capup_ch(t) !R(10) 	 
 	      e_k2(t)>=e_min !R(11) 	 
@@ -186,28 +192,28 @@ objetivo:= sum(t in periodos)(-p_sub(t)*pi_e(t)-r_subup(t)*pi_capup(t)-r_subdn(t
 end-do
 
 !Restricciones EVCSs
-forall(t in 16..munPeriodos, k in agregadores)do
+forall(t in Tsub, k in agregadores)do
 	if(k=3)then
-		b_k3(t) is_binary
+		b_k3 is_binary
 		p_k(t,k)>=0 !R(20)
-		p_k(t,k)<=er_max*b_k3(t)
+		p_k(t,k)<=er_max*b_k3
 		r_kcapup(t,k)>=0 !R(21)
-		r_kcapup(t,k)<=err_max*b_k3(t)
+		r_kcapup(t,k)<=err_max*b_k3
 		r_kcapdn(t,k)>=0 !R(22)
-		r_kcapdn(t,k)<=err_max*b_k3(t)
+		r_kcapdn(t,k)<=err_max*b_k3
 		p_k(t,k)+r_kcapup(t,k)<=er_max !R(23)
 		p_k(t,k)-r_kcapdn(t,k)>=0 !R(24)
-		!R(25)
-		e_int*b_k3(t)+sum(t in Tsub)(p_k(t,k)+r_kcapup(t,k)*mu_up(t)-r_kcapdn(t,k)*mu_dn(t))*gamma_ch>=0.9*cl_max*b_k3(t)
-		e_int*b_k3(t)+sum(t in Tsub)(p_k(t,k)+r_kcapup(t,k)*mu_up(t)-r_kcapdn(t,k)*mu_dn(t))*gamma_ch<=cl_max*b_k3(t)
 	end-if
 end-do 
+!R(25)
+e_int*b_k3+sum(t in Tsub)(p_k(t,3)+r_kcapup(t,3)*mu_up(t)-r_kcapdn(t,3)*mu_dn(t))*gamma_ch>=0.9*cl_max*b_k3
+e_int*b_k3+sum(t in Tsub)(p_k(t,3)+r_kcapup(t,3)*mu_up(t)-r_kcapdn(t,3)*mu_dn(t))*gamma_ch<=cl_max*b_k3
 
 !Restricciones DDGAGs
 forall(t in periodos, k in agregadores) do
 	if(k=4) then
 		p_k(t,k)+r_kcapup(t,k)<=p_k4max !R(26)
-		p_k(t,k)-r_kcapdn(t,k)>=P_k4min !R(27)
+		p_k(t,k)-r_kcapdn(t,k)>=p_k4min !R(27)
 		r_kcapup(t,k)>=0 !R(28)
 		r_kcapup(t,k)<=ru 
 		r_kcapdn(t,k)>=0 !R(29)
@@ -217,19 +223,19 @@ end-do
 
 !Restricciones de flujos de potencia activa, R(30)
 forall(t in periodos,b in barras) do
-	h(b,1)*p_k(t,1) + h(b,3)*p_k(t,3)+p_d(b,t) -  h(b,2)*p_k(t,2)- h(b,4)*p_k(t,4)
-		+ h_sub(b)*p_sub(t) +sum(l in lineas)pl(l,t)*a(l,b) = 0		
-	pl(l,t) is_free	
+	h(b,1)*p_k(t,1) + h(b,3)*p_k(t,3)+p_d(b,t) - h(b,2)*p_k(t,2)- h(b,4)*p_k(t,4) + h_sub(b)*p_sub(t) +sum(l in lineas)pl(l,t)*a(l,b) = 0			
 end-do
 !Restricciones de flujos de potencia reactiva, R(31)
 forall(t in periodos,b in barras) do
-	h(b,1)*p_k(t,1)*tan_phi_k1  +q_d(b,t) - h(b,4)*p_k(t,4)*tan_phi_k4
-		+ h_sub(b)*q_sub(t) +sum(l in lineas)ql(l,t)*a(l,b) = 0		
+	h(b,1)*p_k(t,1)*tan_phi_k1  +q_d(b,t) - h(b,4)*p_k(t,4)*tan_phi_k4 + h_sub(b)*q_sub(t) +sum(l in lineas)ql(l,t)*a(l,b) = 0		
+end-do
+forall(t in periodos,l in lineas) do
 	ql(l,t) is_free	
+	pl(l,t) is_free
 end-do
 !Restricciones de voltaje, R(32)
 forall(t in periodos, m in barras, n in barras,l in lineas) do
-	if (c(m,n)=1 and a(l,n))then
+	if (c(m,n)=1 and a(l,n)=1)then
 		v(m,t)=v(n,t)-(r(l)*pl(l,t)+x(l)+ql(l,t))
 	end-if
 end-do
@@ -254,6 +260,10 @@ end-do
 
 minimise(objetivo)
 !...
+!Costos Operativos
+sol := getobjval
+
+writeln("Costo del sistema: ", sol)
 writeln("End running model")
 
 end-model
