@@ -1,5 +1,6 @@
+!@encoding CP1252
 model Modelopaper
-uses "mmxprs","mmsheet"; !gain access to the Xpress-Optimizer solver
+uses "mmxprs","mmnl","mmsheet"; !gain access to the Xpress-Optimizer solver
 
 declarations
 	!Indices
@@ -69,10 +70,13 @@ declarations
 	!Variables de decisión-----------------------------------------------
 	!variables FO
 	p_sub,q_sub, r_subup, r_subdn: array(periodos) of mpvar
-	p_k, r_kup, r_kdn: array(periodos, agregadores) of mpvar !incluye k1
+	p_k	: array(periodos, agregadores) of mpvar !incluye k1
+	!r_kup, r_kdn: array(periodos, agregadores) of mpvar !incluye k1
 	
-	!variables DRAGs
+	!variables regulacion
 	r_kcapup, r_kcapdn: array(periodos, agregadores) of mpvar !incluye k1
+	
+	!variables DRAGs ya estan incluidas
 	
 	!variables ESAGs
 	e_k2,p_k2di,p_k2ch: array(periodos) of mpvar
@@ -125,10 +129,10 @@ end-initializations
 objetivo:= sum(t in periodos)(-p_sub(t)*pi_e(t)-r_subup(t)*pi_capup(t)-r_subdn(t)*pi_capdn(t)- 
           r_subup(t)*s_up(t)*mu_up(t)*pi_milup(t)-r_subdn*s_dn(t)*mu_dn(t)*pi_mildn(t)+
           sum(k in agregadores|(k=2 or k=4))p_k(t,k)*pi_ek(t,k)-sum(k in agregadores|k=3)p_k(t,k)*pi_e(t,k)+ 
-          sum(k in agregadores)(r_kup(t,k)*pi_kcapup(t,k)+r_kdn(p,k)*pi_kcapdn(t,k)+ 
-          r_kup(t,k)*s_dn(t)*mu_up(t)*pi_kmilup(t,k)+r_kdn(t,k)*s_dn(t)*mu_dn(t)*pi_kmildn(t,k))- 
+          sum(k in agregadores)(r_kcapup(t,k)*pi_kcapup(t,k)+r_kcapdn(p,k)*pi_kcapdn(t,k)+ 
+          r_kcapup(t,k)*s_dn(t)*mu_up(t)*pi_kmilup(t,k)+r_kcapdn(t,k)*s_dn(t)*mu_dn(t)*pi_kmildn(t,k))- 
           sum(k in agregadores|k=1)p_k(t,k)*pi_ek(t,k)) 
-          
+
  !Restricciones DRAGs
  forall(t in periodos, k in agregadores) do 
 	  if(k=1) then
@@ -182,7 +186,7 @@ objetivo:= sum(t in periodos)(-p_sub(t)*pi_e(t)-r_subup(t)*pi_capup(t)-r_subdn(t
 end-do
 
 !Restricciones EVCSs
-forall(t in periodos, k in agregadores)do
+forall(t in 16..munPeriodos, k in agregadores)do
 	if(k=3)then
 		b_k3(t) is_binary
 		p_k(t,k)>=0 !R(20)
@@ -243,15 +247,12 @@ forall(t in periodos, l in lineas) do
 end-do
 !Restricciones suma ofertas
 forall(t in periodos) do
-	r_subup(t)=
+	r_subup(t)=r_kcapup(t,2)+r_kcapup(t,4)+r_kcapdn(t,1)+r_kcapdn(t,3)
+	r_subdn(t)=r_kcapdn(t,2)+r_kcapdn(t,4)+r_kcapup(t,1)+r_kcapup(t,3)
 end-do
 
-if PROJECTDIR <> '' then
-  setparam('workdir', PROJECTDIR)
-  writeln("Project directory: " + PROJECTDIR)
-end-if
 
-writeln("Begin running model")
+minimise(objetivo)
 !...
 writeln("End running model")
 
